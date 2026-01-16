@@ -4,11 +4,11 @@ import (
 	"context"
 	"os"
 
-	"github.com/romariotrain/media-platform/internal/app"
+	"github.com/romariotrain/media-platform/internal/cli"
 )
 
 func main() {
-	code := app.Run("quota", func(ctx context.Context) error {
+	code := cli.Run("quota", func(ctx context.Context) error {
 		<-ctx.Done()
 		return nil
 	})

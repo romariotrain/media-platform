@@ -1,16 +1,12 @@
 package main
 
 import (
-	"context"
 	"os"
 
-	"github.com/romariotrain/media-platform/internal/app"
+	"github.com/romariotrain/media-platform/internal/cli"
 )
 
 func main() {
-	code := app.Run("media", func(ctx context.Context) error {
-		<-ctx.Done()
-		return nil
-	})
+	code := cli.Run("media", run)
 	os.Exit(code)
 }
