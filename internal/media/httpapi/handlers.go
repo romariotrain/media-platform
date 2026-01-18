@@ -116,3 +116,41 @@ func toMediaResponse(m *models.Media) MediaResponse {
 		UpdatedAt: m.UpdatedAt,
 	}
 }
+
+func (h *Handler) ChangeStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Парсим ID из URL: /media/{id}/status
+	path := strings.TrimPrefix(r.URL.Path, "/media/")
+	idStr := strings.TrimSuffix(path, "/status")
+
+	mediaID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	// Парсим body
+	var req struct {
+		Status models.Status `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	// Вызываем сервис
+	media, err := h.svc.ChangeStatus(r.Context(), mediaID, req.Status)
+	if err != nil {
+		// TODO: обработка разных ошибок (404, validation)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Возвращаем результат
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(media)
+}

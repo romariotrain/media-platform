@@ -69,3 +69,27 @@ func (r *MediaRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status model
 
 	return &m, nil
 }
+
+func (r *MediaRepo) BeginTx(ctx context.Context) (*sqlx.Tx, error) {
+	return r.db.BeginTxx(ctx, nil)
+}
+
+func (r *MediaRepo) UpdateStatusTx(ctx context.Context, tx *sqlx.Tx, id uuid.UUID, status models.Status) (*models.Media, error) {
+	const q = `
+        UPDATE media
+        SET status = $2, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, status, type, source, created_at, updated_at
+    `
+
+	var m models.Media
+	// Вместо r.db используем tx!
+	if err := tx.GetContext(ctx, &m, q, id, status); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, models.ErrNotFound
+		}
+		return nil, fmt.Errorf("media update status tx: %w", err)
+	}
+
+	return &m, nil
+}

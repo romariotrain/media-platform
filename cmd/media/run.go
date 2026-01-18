@@ -4,16 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/joho/godotenv"
 	httpapi "github.com/romariotrain/media-platform/internal/media/httpapi"
+	"github.com/romariotrain/media-platform/internal/media/kafka"
+	"github.com/romariotrain/media-platform/internal/media/outbox"
 	"github.com/romariotrain/media-platform/internal/media/service"
 
-	mediarepo "github.com/romariotrain/media-platform/internal/storage/postgres"
 	pg "github.com/romariotrain/media-platform/internal/storage/postgres"
+	repos "github.com/romariotrain/media-platform/internal/storage/postgres"
 )
 
 func run(ctx context.Context) error {
@@ -30,8 +33,10 @@ func run(ctx context.Context) error {
 	defer db.Close()
 
 	// Dependencies
-	repo := mediarepo.NewMediaRepo(db)
-	svc := service.New(repo)
+	mediaRepo := repos.NewMediaRepo(db)
+	outboxRepo := repos.NewOutboxRepo(db)
+
+	svc := service.New(mediaRepo, outboxRepo)
 	h := httpapi.New(svc)
 	router := httpapi.NewRouter(h)
 
@@ -40,6 +45,27 @@ func run(ctx context.Context) error {
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+
+	kafkaProducer := kafka.NewProducer(
+		[]string{"localhost:9092"}, // брокеры из docker-compose
+		"events.media",             // topic
+	)
+	defer kafkaProducer.Close()
+
+	// Создаём outbox publisher
+	outboxPublisher := outbox.NewPublisher(
+		outboxRepo,
+		kafkaProducer,
+		5*time.Second, // каждые 5 секунд
+		100,           // до 100 событий за раз
+	)
+
+	// Запускаем publisher в отдельной горутине
+	go func() {
+		if err := outboxPublisher.Start(ctx); err != nil {
+			log.Printf("Outbox publisher error: %v", err)
+		}
+	}()
 
 	errCh := make(chan error, 1)
 
