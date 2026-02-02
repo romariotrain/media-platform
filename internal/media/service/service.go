@@ -7,10 +7,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/romariotrain/media-platform/internal/media/domain"
-	"github.com/romariotrain/media-platform/internal/storage/postgres"
-
 	"github.com/romariotrain/media-platform/internal/media/models"
 	"github.com/romariotrain/media-platform/internal/media/repository"
+	"github.com/romariotrain/media-platform/internal/media/storage/postgres"
 )
 
 type Service struct {

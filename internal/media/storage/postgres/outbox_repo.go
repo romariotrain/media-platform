@@ -29,7 +29,7 @@ func NewOutboxRepo(db *sqlx.DB) *OutboxRepo {
 
 func (r *OutboxRepo) Add(ctx context.Context, tx *sqlx.Tx, event models.DomainEvent) error {
 	const query = `
-    INSERT INTO outbox (event_id, event_type, aggregate_id, payload, occurred_at)
+    INSERT INTO media_outbox (event_id, event_type, aggregate_id, payload, occurred_at)
     VALUES ($1, $2, $3, $4, $5)
 `
 	payload, err := json.Marshal(event)
@@ -55,7 +55,7 @@ func (r *OutboxRepo) Add(ctx context.Context, tx *sqlx.Tx, event models.DomainEv
 func (r *OutboxRepo) GetPending(ctx context.Context, limit int) ([]OutboxRecord, error) {
 	const q = `
         SELECT id, event_id, event_type, aggregate_id, payload, occurred_at
-        FROM outbox
+        FROM media_outbox
         WHERE processed_at IS NULL
         ORDER BY id ASC
         LIMIT $1
@@ -71,7 +71,7 @@ func (r *OutboxRepo) GetPending(ctx context.Context, limit int) ([]OutboxRecord,
 
 func (r *OutboxRepo) MarkProcessed(ctx context.Context, id int64) error {
 	const q = `
-        UPDATE outbox
+        UPDATE media_outbox
         SET processed_at = NOW()
         WHERE id = $1
     `

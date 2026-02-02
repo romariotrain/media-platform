@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/romariotrain/media-platform/internal/media/kafka"
-	"github.com/romariotrain/media-platform/internal/storage/postgres"
+	"github.com/romariotrain/media-platform/internal/media/storage/postgres"
 	"github.com/rs/zerolog"
 )
 

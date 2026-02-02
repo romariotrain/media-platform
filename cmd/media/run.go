@@ -15,8 +15,8 @@ import (
 	"github.com/romariotrain/media-platform/internal/media/outbox"
 	"github.com/romariotrain/media-platform/internal/media/service"
 
-	pg "github.com/romariotrain/media-platform/internal/storage/postgres"
-	repos "github.com/romariotrain/media-platform/internal/storage/postgres"
+	pg "github.com/romariotrain/media-platform/internal/media/storage/postgres"
+	repos "github.com/romariotrain/media-platform/internal/media/storage/postgres"
 )
 
 func run(ctx context.Context) error {
@@ -46,19 +46,25 @@ func run(ctx context.Context) error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	kafkaProducer := kafka.NewProducer(
-		[]string{"localhost:9092"}, // брокеры из docker-compose
-		"events.media",             // topic
-	)
+	kafkaProducer, err := kafka.NewProducer(kafka.ProducerConfig{
+		Brokers: []string{"localhost:9092"},
+		Topic:   "events.media",
+	})
+	if err != nil {
+		return fmt.Errorf("create kafka producer: %w", err)
+	}
 	defer kafkaProducer.Close()
 
 	// Создаём outbox publisher
-	outboxPublisher := outbox.NewPublisher(
-		outboxRepo,
-		kafkaProducer,
-		5*time.Second, // каждые 5 секунд
-		100,           // до 100 событий за раз
-	)
+	outboxPublisher, err := outbox.NewPublisher(outbox.PublisherConfig{
+		OutboxRepo: outboxRepo,
+		Producer:   kafkaProducer,
+		Interval:   5 * time.Second,
+		BatchSize:  100,
+	})
+	if err != nil {
+		return fmt.Errorf("create outbox publisher: %w", err)
+	}
 
 	// Запускаем publisher в отдельной горутине
 	go func() {
