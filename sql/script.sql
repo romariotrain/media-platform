@@ -77,3 +77,36 @@ CREATE TABLE IF NOT EXISTS processing_outbox (
     occurred_at     TIMESTAMPTZ NOT NULL,
     processed_at    TIMESTAMPTZ
 );
+
+-- ============================================================
+-- Publish Service Tables
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS publications (
+    id              UUID PRIMARY KEY,
+    saga_id         UUID NOT NULL,
+    asset_id        UUID NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'pending',
+    source_paths    JSONB NOT NULL,
+    published_paths JSONB,
+    public_urls     JSONB,
+    error_message   TEXT,
+    published_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_publications_saga_id ON publications(saga_id);
+CREATE INDEX IF NOT EXISTS idx_publications_asset_id ON publications(asset_id);
+CREATE INDEX IF NOT EXISTS idx_publications_status ON publications(status);
+
+CREATE TABLE IF NOT EXISTS publish_outbox (
+    id              BIGSERIAL PRIMARY KEY,
+    event_id        TEXT NOT NULL,
+    event_type      TEXT NOT NULL,
+    aggregate_id    TEXT NOT NULL,
+    saga_id         UUID,
+    payload         JSONB NOT NULL,
+    occurred_at     TIMESTAMPTZ NOT NULL,
+    processed_at    TIMESTAMPTZ
+);
