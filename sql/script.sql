@@ -110,3 +110,36 @@ CREATE TABLE IF NOT EXISTS publish_outbox (
     occurred_at     TIMESTAMPTZ NOT NULL,
     processed_at    TIMESTAMPTZ
 );
+
+-- ============================================================
+-- Orchestrator Service Tables
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS sagas (
+    id              UUID PRIMARY KEY,
+    asset_id        UUID NOT NULL,
+    user_id         TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'created',
+    current_step    TEXT NOT NULL DEFAULT 'PREPARE_INGEST',
+    payload         JSONB,
+    error_message   TEXT,
+    started_at      TIMESTAMPTZ,
+    completed_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sagas_asset_id ON sagas(asset_id);
+CREATE INDEX IF NOT EXISTS idx_sagas_status ON sagas(status);
+CREATE INDEX IF NOT EXISTS idx_sagas_user_id ON sagas(user_id);
+
+CREATE TABLE IF NOT EXISTS orchestrator_outbox (
+    id              BIGSERIAL PRIMARY KEY,
+    event_id        TEXT NOT NULL,
+    event_type      TEXT NOT NULL,
+    aggregate_id    TEXT NOT NULL,
+    saga_id         UUID,
+    payload         JSONB NOT NULL,
+    occurred_at     TIMESTAMPTZ NOT NULL,
+    processed_at    TIMESTAMPTZ
+);
