@@ -1,8 +1,16 @@
 # Binaries
 bin/
+orchestrator
+ingest
+processing
+publish
+media
 
 # PID files
 .pids/
+
+# Logs
+logs/
 
 # Environment
 .env
