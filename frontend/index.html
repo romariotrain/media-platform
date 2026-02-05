@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1117;
+            color: #e1e4e8;
+            min-height: 100vh;
+        }
+
+        /* --- Layout --- */
+        .app { display: flex; min-height: 100vh; }
+
+        .sidebar {
+            width: 220px;
+            background: #161b22;
+            border-right: 1px solid #30363d;
+            padding: 20px 0;
+            flex-shrink: 0;
+        }
+
+        .sidebar h1 {
+            font-size: 16px;
+            padding: 0 16px 16px;
+            border-bottom: 1px solid #30363d;
+            color: #58a6ff;
+        }
+
+        .sidebar nav { padding: 8px 0; }
+
+        .sidebar nav a {
+            display: block;
+            padding: 10px 16px;
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+        }
+
+        .sidebar nav a:hover { background: #1c2128; color: #e1e4e8; }
+        .sidebar nav a.active { border-left-color: #58a6ff; color: #58a6ff; background: #1c2128; }
+
+        .main { flex: 1; padding: 24px 32px; overflow-y: auto; }
+
+        /* --- Page sections --- */
+        .page { display: none; }
+        .page.active { display: block; }
+
+        h2 { font-size: 22px; margin-bottom: 20px; color: #f0f6fc; }
+        h3 { font-size: 16px; margin: 16px 0 8px; color: #c9d1d9; }
+
+        /* --- Cards --- */
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .card-id {
+            font-family: monospace;
+            font-size: 13px;
+            color: #8b949e;
+        }
+
+        .card-row {
+            display: flex;
+            gap: 24px;
+            font-size: 13px;
+            color: #8b949e;
+            margin-top: 4px;
+        }
+
+        .card-row span { display: flex; gap: 4px; }
+        .card-row .label { color: #6e7681; }
+
+        /* --- Status badges --- */
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-created { background: #1f2937; color: #9ca3af; }
+        .badge-running, .badge-publishing, .badge-processing { background: #1e3a5f; color: #58a6ff; }
+        .badge-completed, .badge-published, .badge-done { background: #0d3320; color: #3fb950; }
+        .badge-failed { background: #3d1418; color: #f85149; }
+        .badge-pending { background: #2d2000; color: #d29922; }
+        .badge-ready, .badge-uploaded { background: #0d3320; color: #3fb950; }
+
+        /* --- Steps visualization --- */
+        .steps {
+            display: flex;
+            gap: 4px;
+            margin-top: 12px;
+            align-items: center;
+        }
+
+        .step {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #21262d;
+            color: #484f58;
+        }
+
+        .step.done { background: #0d3320; color: #3fb950; }
+        .step.current { background: #1e3a5f; color: #58a6ff; }
+        .step.failed { background: #3d1418; color: #f85149; }
+
+        .step-arrow { color: #30363d; font-size: 14px; }
+
+        /* --- Forms --- */
+        .form-group { margin-bottom: 16px; }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: #8b949e;
+            margin-bottom: 6px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            max-width: 400px;
+            padding: 8px 12px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #e1e4e8;
+            font-size: 14px;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #58a6ff;
+        }
+
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-primary { background: #238636; color: #fff; }
+        .btn-primary:hover { background: #2ea043; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+        .btn-secondary:hover { background: #30363d; }
+        .btn-danger { background: #da3633; color: #fff; }
+
+        /* --- Table --- */
+        .table-wrap { overflow-x: auto; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid #21262d;
+        }
+
+        th { color: #8b949e; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+        td { color: #c9d1d9; }
+        td.mono { font-family: monospace; font-size: 12px; color: #8b949e; }
+
+        /* --- Health dots --- */
+        .health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+
+        .health-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .health-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .health-dot.up { background: #3fb950; }
+        .health-dot.down { background: #f85149; }
+        .health-dot.unknown { background: #484f58; }
+
+        .health-info h4 { font-size: 14px; color: #e1e4e8; }
+        .health-info p { font-size: 12px; color: #8b949e; margin-top: 2px; }
+
+        /* --- Upload area --- */
+        .upload-area {
+            border: 2px dashed #30363d;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            max-width: 500px;
+        }
+
+        .upload-area:hover { border-color: #58a6ff; }
+        .upload-area.dragover { border-color: #58a6ff; background: #1c2128; }
+        .upload-area p { color: #8b949e; font-size: 14px; margin-top: 8px; }
+        .upload-area .icon { font-size: 32px; color: #484f58; }
+
+        /* --- Empty state --- */
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: #484f58;
+        }
+
+        .empty p { font-size: 14px; margin-top: 8px; }
+
+        /* --- Alerts --- */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+
+        .alert-error { background: #3d1418; color: #f85149; border: 1px solid #f8514933; }
+        .alert-success { background: #0d3320; color: #3fb950; border: 1px solid #3fb95033; }
+        .alert-info { background: #1e3a5f; color: #58a6ff; border: 1px solid #58a6ff33; }
+
+        /* --- Toolbar --- */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 12px;
+        }
+
+        .toolbar-right { display: flex; gap: 8px; }
+
+        /* --- JSON viewer --- */
+        .json-view {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #8b949e;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 8px;
+        }
+
+        /* --- Config section --- */
+        .config-bar {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 8px 16px;
+            font-size: 12px;
+            color: #6e7681;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .config-bar input {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            color: #e1e4e8;
+            padding: 4px 8px;
+            font-size: 12px;
+            width: 200px;
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <h1>Media Platform</h1>
+        <nav>
+            <a onclick="showPage('dashboard')" class="active" id="nav-dashboard">Dashboard</a>
+            <a onclick="showPage('sagas')" id="nav-sagas">Sagas</a>
+            <a onclick="showPage('upload')" id="nav-upload">Upload</a>
+            <a onclick="showPage('publications')" id="nav-publications">Publications</a>
+            <a onclick="showPage('health')" id="nav-health">Services</a>
+        </nav>
+    </aside>
+
+    <div class="main">
+        <!-- Config bar -->
+        <div class="config-bar">
+            <span>API Base URLs:</span>
+            <label>Orchestrator: <input id="cfg-orchestrator" value="http://localhost:8084"></label>
+            <label>Ingest: <input id="cfg-ingest" value="http://localhost:8082"></label>
+            <label>Publish: <input id="cfg-publish" value="http://localhost:8083"></label>
+            <label>Media: <input id="cfg-media" value="http://localhost:8081"></label>
+        </div>
+
+        <!-- ========== DASHBOARD ========== -->
+        <section class="page active" id="page-dashboard">
+            <h2>Dashboard</h2>
+
+            <div class="toolbar">
+                <div>
+                    <div class="form-group" style="margin-bottom:0;display:flex;gap:8px;align-items:end">
+                        <div>
+                            <label>User ID</label>
+                            <input id="dash-user-id" value="user1" style="width:150px">
+                        </div>
+                        <button class="btn btn-secondary" onclick="loadDashboard()">Load</button>
+                    </div>
+                </div>
+                <div class="toolbar-right">
+                    <button class="btn btn-primary" onclick="showPage('sagas');showCreateSaga()">+ New Saga</button>
+                </div>
+            </div>
+
+            <div id="dash-health"></div>
+            <h3>Recent Sagas</h3>
+            <div id="dash-sagas"><div class="empty"><p>Enter User ID and click Load</p></div></div>
+        </section>
+
+        <!-- ========== SAGAS ========== -->
+        <section class="page" id="page-sagas">
+            <h2>Sagas</h2>
+
+            <!-- Create saga form -->
+            <div class="card" id="create-saga-form" style="display:none">
+                <h3>Create New Saga</h3>
+                <div id="create-saga-alert"></div>
+                <div class="form-group">
+                    <label>Asset ID (UUID, will be auto-generated if empty)</label>
+                    <input id="saga-asset-id" placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000">
+                </div>
+                <div class="form-group">
+                    <label>User ID</label>
+                    <input id="saga-user-id" value="user1">
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-primary" onclick="createSaga()">Create Saga</button>
+                    <button class="btn btn-secondary" onclick="hideCreateSaga()">Cancel</button>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <div style="display:flex;gap:8px;align-items:end">
+                    <div class="form-group" style="margin-bottom:0">
+                        <label>Filter by User ID</label>
+                        <input id="saga-filter-user" value="user1" style="width:150px">
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadSagas()">Search</button>
+                </div>
+                <div class="toolbar-right">
+                    <button class="btn btn-primary" onclick="showCreateSaga()">+ New Saga</button>
+                    <button class="btn btn-secondary" onclick="loadSagas()">Refresh</button>
+                </div>
+            </div>
+
+            <div id="sagas-list"><div class="empty"><p>Click Search to load sagas</p></div></div>
+
+            <!-- Saga detail -->
+            <div id="saga-detail" style="display:none"></div>
+        </section>
+
+        <!-- ========== UPLOAD ========== -->
+        <section class="page" id="page-upload">
+            <h2>Upload File</h2>
+
+            <div id="upload-alert"></div>
+
+            <div class="card">
+                <h3>Step 1: Enter upload token</h3>
+                <p style="font-size:13px;color:#8b949e;margin-bottom:12px">
+                    Token is generated by the Ingest service when orchestrator sends PrepareIngest command.
+                    You can get it from the saga details or enter manually.
+                </p>
+                <div class="form-group">
+                    <label>Upload Token</label>
+                    <input id="upload-token" placeholder="paste token here">
+                </div>
+                <button class="btn btn-secondary" onclick="checkToken()">Check Token</button>
+                <div id="token-info" style="margin-top:12px"></div>
+            </div>
+
+            <div class="card">
+                <h3>Step 2: Upload file</h3>
+                <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+                    <div class="icon">&#128193;</div>
+                    <p>Click to select file or drag & drop</p>
+                    <p id="file-name" style="color:#58a6ff"></p>
+                </div>
+                <input type="file" id="file-input" style="display:none" onchange="onFileSelect(event)" accept="video/*,audio/*,image/*">
+                <div style="margin-top:12px">
+                    <button class="btn btn-primary" onclick="uploadFile()" id="upload-btn" disabled>Upload</button>
+                </div>
+                <div id="upload-result" style="margin-top:12px"></div>
+            </div>
+        </section>
+
+        <!-- ========== PUBLICATIONS ========== -->
+        <section class="page" id="page-publications">
+            <h2>Publications</h2>
+
+            <div class="toolbar">
+                <div style="display:flex;gap:8px;align-items:end">
+                    <div class="form-group" style="margin-bottom:0">
+                        <label>Asset ID</label>
+                        <input id="pub-asset-id" placeholder="enter asset UUID" style="width:320px">
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadPublications()">Search</button>
+                </div>
+                <div class="toolbar-right">
+                    <button class="btn btn-secondary" onclick="loadPublications()">Refresh</button>
+                </div>
+            </div>
+
+            <div id="pub-list"><div class="empty"><p>Enter Asset ID and click Search</p></div></div>
+        </section>
+
+        <!-- ========== SERVICES HEALTH ========== -->
+        <section class="page" id="page-health">
+            <h2>Services</h2>
+            <div class="toolbar">
+                <p style="font-size:13px;color:#8b949e">Health check status of all services</p>
+                <button class="btn btn-secondary" onclick="checkAllHealth()">Refresh</button>
+            </div>
+            <div class="health-grid" id="health-grid"></div>
+        </section>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// Config
+// ============================================================
+function getURL(service) {
+    const el = document.getElementById('cfg-' + service);
+    return el ? el.value.replace(/\/+$/, '') : '';
+}
+
+// ============================================================
+// Navigation
+// ============================================================
+function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    document.getElementById('nav-' + name).classList.add('active');
+
+    if (name === 'health') checkAllHealth();
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+function badgeClass(status) {
+    const s = (status || '').toLowerCase();
+    const map = {
+        created: 'badge-created', running: 'badge-running', completed: 'badge-completed',
+        failed: 'badge-failed', pending: 'badge-pending', publishing: 'badge-publishing',
+        published: 'badge-published', processing: 'badge-processing', done: 'badge-completed',
+        ready: 'badge-ready', uploaded: 'badge-uploaded',
+    };
+    return map[s] || 'badge-created';
+}
+
+function shortID(id) {
+    return id ? id.substring(0, 8) + '...' : '-';
+}
+
+function fmtDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+async function apiFetch(url, opts) {
+    try {
+        const res = await fetch(url, opts);
+        if (!res.ok) {
+            const body = await res.text();
+            throw new Error(body || res.statusText);
+        }
+        return await res.json();
+    } catch (e) {
+        throw e;
+    }
+}
+
+function alertHTML(type, msg) {
+    return `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+// ============================================================
+// Saga step visualization
+// ============================================================
+const SAGA_STEPS = ['PREPARE_INGEST', 'WAIT_UPLOAD', 'PROCESS_MEDIA', 'PUBLISH_MEDIA', 'DONE'];
+
+function stepsHTML(saga) {
+    const current = saga.current_step;
+    const status = saga.status;
+    const idx = SAGA_STEPS.indexOf(current);
+
+    return '<div class="steps">' + SAGA_STEPS.map((step, i) => {
+        let cls = 'step';
+        if (status === 'failed' && i === idx) cls += ' failed';
+        else if (status === 'completed' && step === 'DONE') cls += ' done';
+        else if (i < idx) cls += ' done';
+        else if (i === idx) cls += ' current';
+        const label = step.replace(/_/g, ' ');
+        return (i > 0 ? '<span class="step-arrow">&#8594;</span>' : '') + `<span class="${cls}">${label}</span>`;
+    }).join('') + '</div>';
+}
+
+// ============================================================
+// Dashboard
+// ============================================================
+async function loadDashboard() {
+    const userID = document.getElementById('dash-user-id').value.trim();
+    if (!userID) return;
+
+    const container = document.getElementById('dash-sagas');
+    container.innerHTML = '<div class="empty"><p>Loading...</p></div>';
+
+    try {
+        const sagas = await apiFetch(getURL('orchestrator') + '/sagas/list?user_id=' + encodeURIComponent(userID));
+        if (!sagas || sagas.length === 0) {
+            container.innerHTML = '<div class="empty"><p>No sagas found for this user</p></div>';
+            return;
+        }
+        container.innerHTML = sagas.map(s => sagaCardHTML(s)).join('');
+    } catch (e) {
+        container.innerHTML = alertHTML('error', 'Failed to load: ' + e.message);
+    }
+}
+
+function sagaCardHTML(s) {
+    return `
+    <div class="card" onclick="viewSaga('${s.id}')" style="cursor:pointer">
+        <div class="card-header">
+            <span class="card-id">${s.id}</span>
+            <span class="badge ${badgeClass(s.status)}">${s.status}</span>
+        </div>
+        <div class="card-row">
+            <span><span class="label">asset:</span> ${shortID(s.asset_id)}</span>
+            <span><span class="label">user:</span> ${s.user_id}</span>
+            <span><span class="label">created:</span> ${fmtDate(s.created_at)}</span>
+        </div>
+        ${stepsHTML(s)}
+    </div>`;
+}
+
+// ============================================================
+// Sagas
+// ============================================================
+function showCreateSaga() { document.getElementById('create-saga-form').style.display = 'block'; }
+function hideCreateSaga() { document.getElementById('create-saga-form').style.display = 'none'; }
+
+async function createSaga() {
+    const alertEl = document.getElementById('create-saga-alert');
+    let assetID = document.getElementById('saga-asset-id').value.trim();
+    const userID = document.getElementById('saga-user-id').value.trim();
+
+    if (!userID) { alertEl.innerHTML = alertHTML('error', 'User ID is required'); return; }
+
+    // Auto-generate UUID if empty
+    if (!assetID) {
+        assetID = crypto.randomUUID();
+        document.getElementById('saga-asset-id').value = assetID;
+    }
+
+    try {
+        const saga = await apiFetch(getURL('orchestrator') + '/sagas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ asset_id: assetID, user_id: userID })
+        });
+        alertEl.innerHTML = alertHTML('success', 'Saga created: ' + saga.id);
+        hideCreateSaga();
+        loadSagas();
+    } catch (e) {
+        alertEl.innerHTML = alertHTML('error', 'Failed: ' + e.message);
+    }
+}
+
+async function loadSagas() {
+    const userID = document.getElementById('saga-filter-user').value.trim();
+    const container = document.getElementById('sagas-list');
+
+    if (!userID) { container.innerHTML = alertHTML('error', 'Enter user ID'); return; }
+
+    container.innerHTML = '<div class="empty"><p>Loading...</p></div>';
+
+    try {
+        const sagas = await apiFetch(getURL('orchestrator') + '/sagas/list?user_id=' + encodeURIComponent(userID));
+        if (!sagas || sagas.length === 0) {
+            container.innerHTML = '<div class="empty"><p>No sagas found</p></div>';
+            return;
+        }
+        container.innerHTML = sagas.map(s => sagaCardHTML(s)).join('');
+    } catch (e) {
+        container.innerHTML = alertHTML('error', 'Failed: ' + e.message);
+    }
+}
+
+async function viewSaga(id) {
+    const detail = document.getElementById('saga-detail');
+    detail.style.display = 'block';
+    detail.innerHTML = '<div class="card"><p>Loading...</p></div>';
+
+    try {
+        const saga = await apiFetch(getURL('orchestrator') + '/sagas?id=' + id);
+        detail.innerHTML = `
+        <div class="card">
+            <div class="card-header">
+                <h3>Saga Detail</h3>
+                <span class="badge ${badgeClass(saga.status)}">${saga.status}</span>
+            </div>
+            <div class="table-wrap"><table>
+                <tr><th>Field</th><th>Value</th></tr>
+                <tr><td>ID</td><td class="mono">${saga.id}</td></tr>
+                <tr><td>Asset ID</td><td class="mono">${saga.asset_id}</td></tr>
+                <tr><td>User</td><td>${saga.user_id}</td></tr>
+                <tr><td>Status</td><td><span class="badge ${badgeClass(saga.status)}">${saga.status}</span></td></tr>
+                <tr><td>Current Step</td><td>${saga.current_step}</td></tr>
+                <tr><td>Started</td><td>${fmtDate(saga.started_at)}</td></tr>
+                <tr><td>Completed</td><td>${fmtDate(saga.completed_at)}</td></tr>
+                <tr><td>Created</td><td>${fmtDate(saga.created_at)}</td></tr>
+                ${saga.error_message ? `<tr><td>Error</td><td style="color:#f85149">${saga.error_message}</td></tr>` : ''}
+            </table></div>
+            ${stepsHTML(saga)}
+            ${saga.payload ? `<h3>Payload</h3><div class="json-view">${JSON.stringify(saga.payload, null, 2)}</div>` : ''}
+            <div style="margin-top:12px">
+                <button class="btn btn-secondary" onclick="viewSaga('${saga.id}')">Refresh</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('saga-detail').style.display='none'">Close</button>
+            </div>
+        </div>`;
+    } catch (e) {
+        detail.innerHTML = `<div class="card">${alertHTML('error', 'Failed: ' + e.message)}</div>`;
+    }
+}
+
+// ============================================================
+// Upload
+// ============================================================
+let selectedFile = null;
+
+async function checkToken() {
+    const token = document.getElementById('upload-token').value.trim();
+    const info = document.getElementById('token-info');
+    if (!token) { info.innerHTML = alertHTML('error', 'Enter token'); return; }
+
+    try {
+        const data = await apiFetch(getURL('ingest') + '/upload-token?token=' + encodeURIComponent(token));
+        info.innerHTML = `
+        <div class="card">
+            <div class="card-row">
+                <span><span class="label">session:</span> ${shortID(data.session_id)}</span>
+                <span><span class="label">status:</span> <span class="badge ${badgeClass(data.status)}">${data.status}</span></span>
+                <span><span class="label">expires:</span> ${fmtDate(data.expires_at)}</span>
+            </div>
+        </div>`;
+    } catch (e) {
+        info.innerHTML = alertHTML('error', 'Token not found: ' + e.message);
+    }
+}
+
+function onFileSelect(e) {
+    selectedFile = e.target.files[0];
+    if (selectedFile) {
+        document.getElementById('file-name').textContent = selectedFile.name + ' (' + (selectedFile.size / 1024 / 1024).toFixed(2) + ' MB)';
+        document.getElementById('upload-btn').disabled = false;
+    }
+}
+
+// Drag & drop
+const uploadArea = document.getElementById('upload-area');
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+        selectedFile = e.dataTransfer.files[0];
+        document.getElementById('file-name').textContent = selectedFile.name + ' (' + (selectedFile.size / 1024 / 1024).toFixed(2) + ' MB)';
+        document.getElementById('upload-btn').disabled = false;
+    }
+});
+
+async function uploadFile() {
+    const token = document.getElementById('upload-token').value.trim();
+    const result = document.getElementById('upload-result');
+    const alertEl = document.getElementById('upload-alert');
+
+    if (!token) { alertEl.innerHTML = alertHTML('error', 'Enter upload token first'); return; }
+    if (!selectedFile) { alertEl.innerHTML = alertHTML('error', 'Select a file first'); return; }
+
+    const btn = document.getElementById('upload-btn');
+    btn.disabled = true;
+    btn.textContent = 'Uploading...';
+    alertEl.innerHTML = '';
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+        const data = await apiFetch(getURL('ingest') + '/upload?token=' + encodeURIComponent(token), {
+            method: 'POST',
+            body: formData
+        });
+        result.innerHTML = `
+        <div class="alert alert-success">File uploaded successfully!</div>
+        <div class="json-view">${JSON.stringify(data, null, 2)}</div>`;
+    } catch (e) {
+        result.innerHTML = alertHTML('error', 'Upload failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Upload';
+    }
+}
+
+// ============================================================
+// Publications
+// ============================================================
+async function loadPublications() {
+    const assetID = document.getElementById('pub-asset-id').value.trim();
+    const container = document.getElementById('pub-list');
+
+    if (!assetID) { container.innerHTML = alertHTML('error', 'Enter Asset ID'); return; }
+
+    container.innerHTML = '<div class="empty"><p>Loading...</p></div>';
+
+    try {
+        const pubs = await apiFetch(getURL('publish') + '/publications/list?asset_id=' + encodeURIComponent(assetID));
+        if (!pubs || pubs.length === 0) {
+            container.innerHTML = '<div class="empty"><p>No publications found for this asset</p></div>';
+            return;
+        }
+
+        container.innerHTML = pubs.map(p => `
+        <div class="card">
+            <div class="card-header">
+                <span class="card-id">${p.id}</span>
+                <span class="badge ${badgeClass(p.status)}">${p.status}</span>
+            </div>
+            <div class="card-row">
+                <span><span class="label">asset:</span> ${shortID(p.asset_id)}</span>
+                <span><span class="label">saga:</span> ${shortID(p.saga_id)}</span>
+                <span><span class="label">published:</span> ${fmtDate(p.published_at)}</span>
+            </div>
+            ${p.public_urls ? `
+            <h3 style="margin-top:12px">Public URLs</h3>
+            <div class="json-view">${JSON.stringify(p.public_urls, null, 2)}</div>` : ''}
+            ${p.error_message ? `<p style="color:#f85149;margin-top:8px;font-size:13px">Error: ${p.error_message}</p>` : ''}
+        </div>`).join('');
+    } catch (e) {
+        container.innerHTML = alertHTML('error', 'Failed: ' + e.message);
+    }
+}
+
+// ============================================================
+// Health checks
+// ============================================================
+const SERVICES = [
+    { name: 'Orchestrator', key: 'orchestrator', port: 8084 },
+    { name: 'Ingest',       key: 'ingest',       port: 8082 },
+    { name: 'Publish',      key: 'publish',       port: 8083 },
+    { name: 'Media',        key: 'media',         port: 8081 },
+];
+
+async function checkHealth(service) {
+    try {
+        const res = await fetch(getURL(service.key) + '/health', { signal: AbortSignal.timeout(3000) });
+        return res.ok;
+    } catch { return false; }
+}
+
+async function checkAllHealth() {
+    const grid = document.getElementById('health-grid');
+    grid.innerHTML = SERVICES.map(s => `
+        <div class="health-card" id="health-${s.key}">
+            <div class="health-dot unknown"></div>
+            <div class="health-info">
+                <h4>${s.name}</h4>
+                <p>:${s.port} &mdash; checking...</p>
+            </div>
+        </div>
+    `).join('');
+
+    for (const s of SERVICES) {
+        const ok = await checkHealth(s);
+        const card = document.getElementById('health-' + s.key);
+        const dot = card.querySelector('.health-dot');
+        const info = card.querySelector('p');
+        dot.className = 'health-dot ' + (ok ? 'up' : 'down');
+        info.textContent = ':' + s.port + ' \u2014 ' + (ok ? 'healthy' : 'unreachable');
+    }
+}
+</script>
+</body>
+</html>
