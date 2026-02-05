@@ -1,47 +1,48 @@
 .PHONY: help infra infra-down infra-logs db-init db-reset build \
-        run-orchestrator run-ingest run-processing run-publish run-media \
-        run-all stop-all status clean
+       run-orchestrator run-ingest run-processing run-publish run-media \
+       run-all stop-all status clean
 
-COMPOSE_FILE = deploy/docker-compose.yml
-DATABASE_URL  = postgres://mediauser:mediapass@localhost:5433/mediadb?sslmode=disable
-SQL_FILE      = sql/script.sql
+COMPOSE_FILE   = deploy/docker-compose.yml
+DATABASE_URL   = postgres://mediauser:mediapass@localhost:5433/mediadb?sslmode=disable
+KAFKA_BROKERS  = localhost:9092
+
+# ─── Help ───────────────────────────────────────────────────────────────────────
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-# ── Infrastructure ───────────────────────────────────────────────
+# ─── Infrastructure ─────────────────────────────────────────────────────────────
 
-infra: ## Start Kafka + Postgres (DB auto-inits from sql/script.sql)
+infra: ## Start Kafka, PostgreSQL, Redis via Docker Compose
 	docker compose -f $(COMPOSE_FILE) up -d
-	@echo "Waiting for Postgres..."
-	@until docker compose -f $(COMPOSE_FILE) exec -T postgres pg_isready -U mediauser -d mediadb > /dev/null 2>&1; do sleep 1; done
-	@echo "Waiting for Kafka..."
-	@until docker compose -f $(COMPOSE_FILE) exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1; do sleep 1; done
+	@echo "Waiting for postgres…"
+	@until docker exec mp_postgres pg_isready -U mediauser -d mediadb > /dev/null 2>&1; do sleep 1; done
+	@echo "Waiting for kafka…"
+	@until docker exec mp_kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1; do sleep 1; done
 	@echo "Infrastructure is ready."
 
-infra-down: ## Stop infrastructure
+infra-down: ## Stop all infrastructure containers
 	docker compose -f $(COMPOSE_FILE) down
 
 infra-logs: ## Tail infrastructure logs
 	docker compose -f $(COMPOSE_FILE) logs -f
 
-# ── Database ─────────────────────────────────────────────────────
+# ─── Database ────────────────────────────────────────────────────────────────────
 
-db-init: ## Apply schema (sql/script.sql) to running Postgres
-	psql "$(DATABASE_URL)" -f $(SQL_FILE)
+db-init: ## Apply SQL schema (runs automatically on first 'make infra')
+	PGPASSWORD=mediapass psql -h localhost -p 5433 -U mediauser -d mediadb -f sql/script.sql
 
-db-reset: ## Drop all tables and re-apply schema
-	psql "$(DATABASE_URL)" -c "\
+db-reset: ## Drop and recreate all tables
+	PGPASSWORD=mediapass psql -h localhost -p 5433 -U mediauser -d mediadb -c "\
 		DROP TABLE IF EXISTS orchestrator_outbox, sagas, \
-		ingest_outbox, upload_sessions, \
-		processing_outbox, processing_tasks, \
 		publish_outbox, publications, \
-		media CASCADE;"
-	psql "$(DATABASE_URL)" -f $(SQL_FILE)
-	@echo "Database reset complete."
+		processing_outbox, processing_tasks, \
+		ingest_outbox, assets, \
+		media_outbox, quotas CASCADE;"
+	$(MAKE) db-init
 
-# ── Build ────────────────────────────────────────────────────────
+# ─── Build ───────────────────────────────────────────────────────────────────────
 
 build: ## Build all services into bin/
 	@mkdir -p bin
@@ -52,67 +53,71 @@ build: ## Build all services into bin/
 	go build -o bin/media       ./cmd/media
 	@echo "All binaries in bin/"
 
-# ── Run (foreground, one service) ────────────────────────────────
+# ─── Run individual services (foreground) ────────────────────────────────────────
 
-run-orchestrator: ## Run orchestrator (foreground)
+run-orchestrator: ## Run orchestrator service
 	go run ./cmd/orchestrator
 
-run-ingest: ## Run ingest (foreground)
+run-ingest: ## Run ingest service
 	go run ./cmd/ingest
 
-run-processing: ## Run processing (foreground)
+run-processing: ## Run processing service
 	go run ./cmd/processing
 
-run-publish: ## Run publish (foreground)
+run-publish: ## Run publish service
 	go run ./cmd/publish
 
-run-media: ## Run media (foreground)
+run-media: ## Run media service
 	go run ./cmd/media
 
-# ── Run all (background) ────────────────────────────────────────
+# ─── Run all services (background) ──────────────────────────────────────────────
 
 run-all: build ## Build & run all services in background
-	@mkdir -p .pids
-	@echo "Starting services..."
-	@bin/orchestrator & echo $$! > .pids/orchestrator.pid
-	@bin/ingest       & echo $$! > .pids/ingest.pid
-	@bin/processing   & echo $$! > .pids/processing.pid
-	@bin/publish      & echo $$! > .pids/publish.pid
-	@bin/media        & echo $$! > .pids/media.pid
-	@echo "All services started. PIDs in .pids/"
+	@mkdir -p .pids logs
+	@echo "Starting services…"
+	@./bin/orchestrator > logs/orchestrator.log 2>&1 & echo $$! > .pids/orchestrator.pid
+	@./bin/ingest      > logs/ingest.log      2>&1 & echo $$! > .pids/ingest.pid
+	@./bin/processing  > logs/processing.log  2>&1 & echo $$! > .pids/processing.pid
+	@./bin/publish     > logs/publish.log     2>&1 & echo $$! > .pids/publish.pid
+	@./bin/media       > logs/media.log       2>&1 & echo $$! > .pids/media.pid
+	@echo "All services started. PIDs:"
+	@for f in .pids/*.pid; do printf "  %-16s PID %s\n" "$$(basename $$f .pid)" "$$(cat $$f)"; done
+	@echo "Logs in logs/  |  Stop with: make stop-all"
 
 stop-all: ## Stop all background services
-	@for f in .pids/*.pid; do \
-		if [ -f "$$f" ]; then \
-			pid=$$(cat "$$f"); \
+	@if [ -d .pids ]; then \
+		for f in .pids/*.pid; do \
+			pid=$$(cat "$$f" 2>/dev/null); \
 			name=$$(basename "$$f" .pid); \
 			if kill -0 "$$pid" 2>/dev/null; then \
 				kill "$$pid" && echo "Stopped $$name ($$pid)"; \
 			else \
 				echo "$$name already stopped"; \
 			fi; \
-			rm -f "$$f"; \
-		fi; \
-	done
+		done; \
+		rm -rf .pids; \
+	else \
+		echo "No running services found"; \
+	fi
 
-# ── Status ───────────────────────────────────────────────────────
+# ─── Status ──────────────────────────────────────────────────────────────────────
 
-status: ## Check infrastructure + services health
-	@echo "=== Docker ==="
-	@docker compose -f $(COMPOSE_FILE) ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null || echo "  docker compose not running"
+status: ## Show infrastructure and service status
+	@echo "=== Docker containers ==="
+	@docker compose -f $(COMPOSE_FILE) ps
 	@echo ""
 	@echo "=== Services ==="
-	@for svc in orchestrator:8084 ingest:8082 publish:8083 media:8081; do \
-		name=$${svc%%:*}; port=$${svc##*:}; \
-		if curl -sf http://localhost:$$port/health > /dev/null 2>&1; then \
-			echo "  $$name ($$port) ✓"; \
+	@for svc_port in orchestrator:8084 ingest:8081 publish:8083 media:8085; do \
+		svc=$${svc_port%%:*}; port=$${svc_port##*:}; \
+		if curl -s -o /dev/null -w '' http://localhost:$$port/health 2>/dev/null; then \
+			printf "  \033[32m●\033[0m %-16s http://localhost:%s\n" "$$svc" "$$port"; \
 		else \
-			echo "  $$name ($$port) ✗"; \
+			printf "  \033[31m●\033[0m %-16s (not responding)\n" "$$svc"; \
 		fi; \
 	done
-	@echo "  processing      (no HTTP)"
+	@printf "  \033[33m●\033[0m %-16s (no HTTP, kafka-only)\n" "processing"
 
-# ── Cleanup ──────────────────────────────────────────────────────
+# ─── Clean ───────────────────────────────────────────────────────────────────────
 
-clean: ## Remove binaries, PIDs, uploaded/output files
-	rm -rf bin .pids uploads output published
+clean: ## Remove build artifacts, logs, pid files
+	rm -rf bin/ logs/ .pids/
