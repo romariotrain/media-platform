@@ -2,13 +2,23 @@ package outbox
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/romariotrain/media-platform/internal/publish/storage/postgres"
 	"github.com/rs/zerolog"
 	kafkago "github.com/segmentio/kafka-go"
 )
+
+// eventEnvelope — обёртка для события с saga_id для оркестратора
+type eventEnvelope struct {
+	MessageID string          `json:"message_id"`
+	SagaID    uuid.UUID       `json:"saga_id"`
+	Type      string          `json:"type"`
+	Payload   json.RawMessage `json:"payload"`
+}
 
 // Publisher реализует Outbox паттерн для Publish сервиса
 type Publisher struct {
@@ -102,10 +112,28 @@ func (p *Publisher) publishBatch(ctx context.Context) error {
 
 		topic := mapEventTypeToTopic(record.EventType)
 
+		// Оборачиваем payload в envelope с saga_id для оркестратора
+		var sagaID uuid.UUID
+		if record.SagaID != nil {
+			sagaID = *record.SagaID
+		}
+		envelope := eventEnvelope{
+			MessageID: record.EventID,
+			SagaID:    sagaID,
+			Type:      record.EventType,
+			Payload:   record.Payload,
+		}
+		envelopeJSON, err := json.Marshal(envelope)
+		if err != nil {
+			eventLogger.Error().Err(err).Msg("failed to marshal envelope")
+			failed++
+			continue
+		}
+
 		msg := kafkago.Message{
 			Topic: topic,
 			Key:   []byte(record.EventID),
-			Value: record.Payload,
+			Value: envelopeJSON,
 		}
 
 		if err := p.writer.WriteMessages(ctx, msg); err != nil {

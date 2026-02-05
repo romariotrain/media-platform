@@ -40,10 +40,14 @@ func run(ctx context.Context) error {
 		outputDir = "processed"
 	}
 
-	// FFmpeg processor
-	processor, err := ffmpeg.NewProcessor(outputDir)
+	// FFmpeg processor (или mock если ffmpeg недоступен)
+	var processor service.Processor
+	ffmpegProcessor, err := ffmpeg.NewProcessor(outputDir)
 	if err != nil {
-		return fmt.Errorf("create ffmpeg processor: %w", err)
+		log.Warn().Err(err).Msg("ffmpeg not available, using mock processor")
+		processor = service.NewMockProcessor(outputDir)
+	} else {
+		processor = ffmpegProcessor
 	}
 
 	// Репозитории
