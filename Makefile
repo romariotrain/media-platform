@@ -107,7 +107,7 @@ status: ## Show infrastructure and service status
 	@docker compose -f $(COMPOSE_FILE) ps
 	@echo ""
 	@echo "=== Services ==="
-	@for svc_port in orchestrator:8084 ingest:8081 publish:8083 media:8085; do \
+	@for svc_port in media:8081 ingest:8082 publish:8083 orchestrator:8084; do \
 		svc=$${svc_port%%:*}; port=$${svc_port##*:}; \
 		if curl -s -o /dev/null -w '' http://localhost:$$port/health 2>/dev/null; then \
 			printf "  \033[32m●\033[0m %-16s http://localhost:%s\n" "$$svc" "$$port"; \
