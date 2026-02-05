@@ -61,7 +61,7 @@ func run(ctx context.Context) error {
 
 	// HTTP
 	h := httpapi.New(svc)
-	router := httpapi.NewRouter(h)
+	router := httpapi.NewRouter(h, publishDir)
 
 	srv := &http.Server{
 		Addr:              ":8083",

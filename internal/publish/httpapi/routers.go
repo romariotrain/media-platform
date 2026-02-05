@@ -17,7 +17,7 @@ func cors(next http.Handler) http.Handler {
 }
 
 // NewRouter создаёт HTTP-роутер для Publish сервиса
-func NewRouter(h *Handler) http.Handler {
+func NewRouter(h *Handler, publishDir string) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", h.Health)
@@ -27,6 +27,10 @@ func NewRouter(h *Handler) http.Handler {
 
 	// GET /publications/list?asset_id=<uuid>
 	mux.HandleFunc("/publications/list", h.ListPublications)
+
+	// GET /static/<asset_id>/<file> — отдача опубликованных файлов
+	fileServer := http.StripPrefix("/static/", http.FileServer(http.Dir(publishDir)))
+	mux.Handle("/static/", fileServer)
 
 	return cors(mux)
 }
